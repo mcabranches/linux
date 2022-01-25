@@ -45,6 +45,7 @@
 #include <linux/filter.h>
 #include <linux/ratelimit.h>
 #include <linux/seccomp.h>
+#include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/bpf.h>
 #include <linux/btf.h>
@@ -5759,6 +5760,53 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 	.arg4_type	= ARG_ANYTHING,
 };
 
+//m-> add simple xdp kernel helper ...
+
+static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
+{
+	struct net_device *dev;
+
+	struct net_device *egress_dev;
+
+	//struct net_bridge_fdb_entry f;
+	
+	dev = dev_get_by_index_rcu(net, params->ifindex);
+	if (unlikely(!dev))
+		return -ENODEV;
+
+//	printk(KERN_INFO "This is a simple helper\n");
+	printk(KERN_INFO "This will be the bpf_xdp_lookup helper\n");
+	printk(KERN_INFO "Received a packet on: %s\n", dev->name);
+
+	if(netif_is_bridge_port(dev)) {
+		printk(KERN_INFO "Device is bridge port, performing fdb lookup...");
+		//br_fdb_get(dev, params->addr, f, params->vid);
+		egress_dev = br_fdb_find_port(dev, params->addr, params->vid);
+
+		if(egress_dev)
+			printk(KERN_INFO "Entry found on fdb");
+	}
+	return 1;
+}
+//m-> include plen to check params
+BPF_CALL_3(bpf_fdb_lookup, struct xdp_buff *, ctx,
+		struct bpf_fdb_lookup *, params, int, plen)
+{
+		if (plen < sizeof(*params))
+			return -EINVAL;
+			
+		return bpf_xdp_fdb_lookup(dev_net(ctx->rxq->dev), params);
+}
+
+static const struct bpf_func_proto bpf_fdb_lookup_proto = {
+	.func =  bpf_fdb_lookup,
+	.gpl_only = false, 
+	.ret_type = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM,
+	.arg3_type      = ARG_CONST_SIZE,
+};
+
 static struct net_device *__dev_via_ifindex(struct net_device *dev_curr,
 					    u32 ifindex)
 {
@@ -7537,6 +7585,8 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_xdp_fib_lookup_proto;
 	case BPF_FUNC_check_mtu:
 		return &bpf_xdp_check_mtu_proto;
+	case BPF_FUNC_fdb_lookup:
+		return &bpf_fdb_lookup_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_sk_lookup_udp:
 		return &bpf_xdp_sk_lookup_udp_proto;

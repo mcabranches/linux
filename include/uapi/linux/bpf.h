@@ -5206,6 +5206,7 @@ union bpf_attr {
 	FN(get_func_arg),		\
 	FN(get_func_ret),		\
 	FN(get_func_arg_cnt),		\
+	FN(fdb_lookup),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -6487,6 +6488,13 @@ struct bpf_core_relo {
 	__u32 type_id;
 	__u32 access_str_off;
 	enum bpf_core_relo_kind kind;
+};
+
+/*m-> fdb_lookup */
+struct bpf_fdb_lookup {
+	__u32 ifindex;
+	const unsigned char addr[6];
+	u16 vid;
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
