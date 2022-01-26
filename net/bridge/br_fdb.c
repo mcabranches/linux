@@ -837,26 +837,6 @@ errout:
 	return err;
 }
 
-
-//m-> get fdb entry. Do not populate skb (called in XDP hook)
-/*int br_fdb_get_xdp(struct net_device *dev,
-				const unsigned char *addr, 
-				struct net_bridge_fdb_entry *f, 
-				u16 vid)
-{
-	struct net_bridge *br = netdev_priv(dev);
-	int err = 0;
-	rcu_read_lock();
-	f = br_fdb_find_rcu(br, addr, vid);
-	if (!f) {
-		err = -ENOENT;
-		goto errout;
-	}
-errout:
-	rcu_read_unlock();
-	return err;
-}*/
-
 /* returns true if the fdb is modified */
 static bool fdb_handle_notify(struct net_bridge_fdb_entry *fdb, u8 notify)
 {

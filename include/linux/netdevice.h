@@ -1513,6 +1513,10 @@ struct net_device_ops {
 					       const unsigned char *addr,
 					       u16 vid, u32 portid, u32 seq,
 					       struct netlink_ext_ack *extack);
+	//m-> fdb helper
+	struct net_device* (*ndo_fdb_find_port)(const struct net_device *br_dev,
+				    const unsigned char *addr,
+				    u16 vid);
 	int			(*ndo_bridge_setlink)(struct net_device *dev,
 						      struct nlmsghdr *nlh,
 						      u16 flags,

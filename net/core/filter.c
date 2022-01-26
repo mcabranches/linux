@@ -45,7 +45,6 @@
 #include <linux/filter.h>
 #include <linux/ratelimit.h>
 #include <linux/seccomp.h>
-#include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/bpf.h>
 #include <linux/btf.h>
@@ -5761,34 +5760,38 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 };
 
 //m-> add simple xdp kernel helper ...
-
 static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
 {
 	struct net_device *dev;
-
+	struct net_device *br_dev;
 	struct net_device *egress_dev;
-
-	//struct net_bridge_fdb_entry f;
+	const struct net_device_ops *ops;
 	
+	printk(KERN_INFO "bpf_fdb_lookup");
 	dev = dev_get_by_index_rcu(net, params->ifindex);
 	if (unlikely(!dev))
 		return -ENODEV;
-
-//	printk(KERN_INFO "This is a simple helper\n");
-	printk(KERN_INFO "This will be the bpf_xdp_lookup helper\n");
-	printk(KERN_INFO "Received a packet on: %s\n", dev->name);
-
+	
 	if(netif_is_bridge_port(dev)) {
 		printk(KERN_INFO "Device is bridge port, performing fdb lookup...");
-		//br_fdb_get(dev, params->addr, f, params->vid);
-		egress_dev = br_fdb_find_port(dev, params->addr, params->vid);
+		br_dev = netdev_master_upper_dev_get_rcu(dev);
+		ops = br_dev->netdev_ops;
+		//getting "RTNL: assertion failed at net/bridge/br_fdb.c"
+		if(ops->ndo_fdb_find_port)
+			egress_dev = ops->ndo_fdb_find_port(br_dev, params->addr, params->vid);
+		else
+			printk(KERN_INFO "op not supported by device");
 
-		if(egress_dev)
-			printk(KERN_INFO "Entry found on fdb");
+		if(egress_dev) {
+			params->egress_ifindex = egress_dev->ifindex;
+			printk(KERN_INFO "Entry found on fdb: index = %i", params->egress_ifindex);
+		}
+		else
+			printk(KERN_INFO "Entry not found on fdb");
 	}
 	return 1;
 }
-//m-> include plen to check params
+
 BPF_CALL_3(bpf_fdb_lookup, struct xdp_buff *, ctx,
 		struct bpf_fdb_lookup *, params, int, plen)
 {

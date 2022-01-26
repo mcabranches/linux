@@ -6492,9 +6492,10 @@ struct bpf_core_relo {
 
 /*m-> fdb_lookup */
 struct bpf_fdb_lookup {
-	__u32 ifindex;
 	const unsigned char addr[6];
-	u16 vid;
+	__u32 ifindex;
+	__u32 egress_ifindex;
+	__u16 vid;
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
