@@ -5767,27 +5767,32 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
 	struct net_device *egress_dev;
 	const struct net_device_ops *ops;
 	
-	printk(KERN_INFO "bpf_fdb_lookup");
+	//printk(KERN_INFO "bpf_fdb_lookup");
 	dev = dev_get_by_index_rcu(net, params->ifindex);
 	if (unlikely(!dev))
 		return -ENODEV;
 	
 	if(netif_is_bridge_port(dev)) {
-		printk(KERN_INFO "Device is bridge port, performing fdb lookup...");
+		//printk(KERN_INFO "Device is bridge port, performing fdb lookup...");
 		br_dev = netdev_master_upper_dev_get_rcu(dev);
 		ops = br_dev->netdev_ops;
-		//getting "RTNL: assertion failed at net/bridge/br_fdb.c"
+		
+		if(ops->ndo_fdb_lookup)
+			params->flags = ops->ndo_fdb_lookup(br_dev, params->src_mac, params->vid); 
+		//else
+		//	printk(KERN_INFO "op not supported by device");
+		
 		if(ops->ndo_fdb_find_port)
-			egress_dev = ops->ndo_fdb_find_port(br_dev, params->addr, params->vid);
-		else
-			printk(KERN_INFO "op not supported by device");
+			egress_dev = ops->ndo_fdb_find_port(br_dev, params->dst_mac, params->vid);
+		//else
+		//	printk(KERN_INFO "op not supported by device");
 
 		if(egress_dev) {
 			params->egress_ifindex = egress_dev->ifindex;
-			printk(KERN_INFO "Entry found on fdb: index = %i", params->egress_ifindex);
+		//	printk(KERN_INFO "Entry found on fdb: index = %i", params->egress_ifindex);
 		}
-		else
-			printk(KERN_INFO "Entry not found on fdb");
+		//else
+		//	printk(KERN_INFO "Entry not found on fdb");
 	}
 	return 1;
 }

@@ -474,6 +474,7 @@ static const struct net_device_ops br_netdev_ops = {
 	.ndo_fill_forward_path	 = br_fill_forward_path,
 	//m-> fdb helper
 	.ndo_fdb_find_port = br_fdb_find_port,
+	.ndo_fdb_lookup = br_fdb_lookup,
 };
 
 static struct device_type br_type = {

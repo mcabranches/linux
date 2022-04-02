@@ -1517,6 +1517,9 @@ struct net_device_ops {
 	struct net_device* (*ndo_fdb_find_port)(const struct net_device *br_dev,
 				    const unsigned char *addr,
 				    u16 vid);
+	//m-> add support to learning and aging
+	int			(*ndo_fdb_lookup)(const struct net_device *dev, 
+					const unsigned char *addr, u16 vid);
 	int			(*ndo_bridge_setlink)(struct net_device *dev,
 						      struct nlmsghdr *nlh,
 						      u16 flags,

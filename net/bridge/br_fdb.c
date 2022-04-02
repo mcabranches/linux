@@ -1321,3 +1321,23 @@ void br_fdb_clear_offload(const struct net_device *dev, u16 vid)
 	spin_unlock_bh(&p->br->hash_lock);
 }
 EXPORT_SYMBOL_GPL(br_fdb_clear_offload);
+
+//m-> add support to learning and aging to bpf_fdb_lookup
+int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 vid)
+{
+	struct net_bridge *br = netdev_priv(dev);	
+	struct net_bridge_fdb_entry *fdb;
+
+	fdb = br_fdb_find(br, addr, vid);
+	
+	if (!fdb)
+		return 0;
+	else {
+		unsigned long now = jiffies;
+		
+		if (now != fdb->updated)
+			fdb->updated = now;
+		
+		return 1;
+	}
+}
