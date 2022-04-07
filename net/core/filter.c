@@ -5760,7 +5760,8 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 };
 
 //m-> add simple xdp kernel helper ...
-static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
+static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
+								unsigned char *src_mac, unsigned char *dst_mac)
 {
 	struct net_device *dev;
 	struct net_device *br_dev;
@@ -5778,12 +5779,12 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
 		ops = br_dev->netdev_ops;
 		
 		if(ops->ndo_fdb_lookup)
-			params->flags = ops->ndo_fdb_lookup(br_dev, params->src_mac, params->vid); 
+			params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid); 
 		//else
 		//	printk(KERN_INFO "op not supported by device");
 		
 		if(ops->ndo_fdb_find_port)
-			egress_dev = ops->ndo_fdb_find_port(br_dev, params->dst_mac, params->vid);
+			egress_dev = ops->ndo_fdb_find_port(br_dev, dst_mac, params->vid);
 		//else
 		//	printk(KERN_INFO "op not supported by device");
 
@@ -5797,13 +5798,13 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params)
 	return 1;
 }
 
-BPF_CALL_3(bpf_fdb_lookup, struct xdp_buff *, ctx,
-		struct bpf_fdb_lookup *, params, int, plen)
+BPF_CALL_5(bpf_fdb_lookup, struct xdp_buff *, ctx,
+		struct bpf_fdb_lookup *, params, int, plen, unsigned char *, src_mac, unsigned char *, dst_mac)
 {
 		if (plen < sizeof(*params))
 			return -EINVAL;
 			
-		return bpf_xdp_fdb_lookup(dev_net(ctx->rxq->dev), params);
+		return bpf_xdp_fdb_lookup(dev_net(ctx->rxq->dev), params, src_mac, dst_mac);
 }
 
 static const struct bpf_func_proto bpf_fdb_lookup_proto = {
@@ -5813,6 +5814,8 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 	.arg1_type      = ARG_PTR_TO_CTX,
 	.arg2_type      = ARG_PTR_TO_MEM,
 	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type		= ARG_ANYTHING,
+	.arg5_type		= ARG_ANYTHING,
 };
 
 static struct net_device *__dev_via_ifindex(struct net_device *dev_curr,

@@ -6492,8 +6492,8 @@ struct bpf_core_relo {
 
 /*m-> fdb_lookup */
 struct bpf_fdb_lookup {
-	const unsigned char dst_mac[6];
-	const unsigned char src_mac[6];
+	//const unsigned char dst_mac[6];
+	//const unsigned char src_mac[6];
 	__u32 ifindex;
 	__u32 egress_ifindex;
 	__u16 vid;
