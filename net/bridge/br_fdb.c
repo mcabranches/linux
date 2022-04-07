@@ -1322,13 +1322,20 @@ void br_fdb_clear_offload(const struct net_device *dev, u16 vid)
 }
 EXPORT_SYMBOL_GPL(br_fdb_clear_offload);
 
-//m-> add support to learning and aging to bpf_fdb_lookup
+/*m-> add support to learning and aging to bpf_fdb_lookup
+only call this from XDP as we do not hold an rcu_lock*/ 
 int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 vid)
 {
 	struct net_bridge *br = netdev_priv(dev);	
 	struct net_bridge_fdb_entry *fdb;
+	struct net_bridge_fdb_key key;
 
-	fdb = br_fdb_find(br, addr, vid);
+	key.vlan_id = vid;
+	memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
+
+	fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);	
+
+	//fdb = br_fdb_find(br, addr, vid);
 	
 	if (!fdb)
 		return 0;
