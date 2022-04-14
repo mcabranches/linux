@@ -5778,22 +5778,22 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		br_dev = netdev_master_upper_dev_get_rcu(dev);
 		ops = br_dev->netdev_ops;
 		
-		if(ops->ndo_fdb_lookup)
-			params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid); 
-		//else
-		//	printk(KERN_INFO "op not supported by device");
-		
-		if(ops->ndo_fdb_find_port)
+		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
+			params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid);
 			egress_dev = ops->ndo_fdb_find_port(br_dev, dst_mac, params->vid);
-		//else
-		//	printk(KERN_INFO "op not supported by device");
+		}
+		else
+			return -EINVAL;
 
 		if(egress_dev) {
 			params->egress_ifindex = egress_dev->ifindex;
 		//	printk(KERN_INFO "Entry found on fdb: index = %i", params->egress_ifindex);
+			/* avoid sending packets on the interface it was received */
+			if (params->egress_ifindex == params->ifindex)
+				params->flags = 0; //change this to 2 (drop) t see what happens
 		}
-		//else
-		//	printk(KERN_INFO "Entry not found on fdb");
+		else
+			return -ENODEV;
 	}
 	return 1;
 }
