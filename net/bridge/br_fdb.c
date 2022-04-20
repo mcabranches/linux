@@ -1344,7 +1344,7 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 		unsigned long now = jiffies;
 		
 		if (now != fdb->used)
-			fdb->used = now;
+			fdb->used = fdb->updated = now; //Linux resets both as observed with "bridge -s"
 
 		port = fdb->dst;
 
