@@ -5427,8 +5427,16 @@ static int bpf_fib_set_fwd_params(struct bpf_fib_lookup *params,
 {
 	memcpy(params->dmac, neigh->ha, ETH_ALEN);
 	memcpy(params->smac, dev->dev_addr, ETH_ALEN);
-	params->h_vlan_TCI = 0;
-	params->h_vlan_proto = 0;
+	//m-> Add a test to verify that the device is also part of a bridge
+	if (is_vlan_dev(dev)) {
+		struct vlan_dev_priv *vinfo = vlan_dev_priv(dev);
+		params->h_vlan_TCI = vinfo->vlan_id;
+		params->h_vlan_proto = 0;
+	}
+	else {
+		params->h_vlan_TCI = 0;
+		params->h_vlan_proto = 0;
+	}
 	if (mtu)
 		params->mtu_result = mtu; /* union with tot_len */
 
@@ -5777,6 +5785,13 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		//printk(KERN_INFO "Device is bridge port, performing fdb lookup...");
 		br_dev = netdev_master_upper_dev_get_rcu(dev);
 		ops = br_dev->netdev_ops;
+
+		//br device has IP addresses and may do routing
+		if (memcmp(br_dev->dev_addr, dst_mac, ETH_ALEN) == 0) {
+			params->egress_ifindex = 0;
+			params->flags = 3; //needs routing
+			return -EINVAL;
+		}
 		
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
 			params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid);
