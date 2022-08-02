@@ -5797,7 +5797,8 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		}
 		
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
-			params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid);
+			if (params->flags != 3) //learning already happened
+				params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid);
 			egress_dev = ops->ndo_fdb_find_port(br_dev, dst_mac, params->vid);
 		}
 		else
