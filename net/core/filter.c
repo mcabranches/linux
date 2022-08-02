@@ -5788,9 +5788,12 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 
 		//br device has IP addresses and may do routing
 		if (memcmp(br_dev->dev_addr, dst_mac, ETH_ALEN) == 0) {
+			if (!(ops->ndo_fdb_lookup(br_dev, src_mac, params->vid)))
+				params->flags = 0;
+			else
+				params->flags = 3; //needs routing
 			params->egress_ifindex = 0;
-			params->flags = 3; //needs routing
-			return -EINVAL;
+			return -ENODEV;
 		}
 		
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
