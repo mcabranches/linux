@@ -1323,7 +1323,7 @@ void br_fdb_clear_offload(const struct net_device *dev, u16 vid)
 EXPORT_SYMBOL_GPL(br_fdb_clear_offload);
 
 /* m-> add support to learning and aging to bpf_fdb_lookup
-only call this from XDP as we do not hold an rcu_lock */ 
+only call this from XDP as we do not hold an rcu_lock TNA */ 
 int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 vid)
 {
 	struct net_bridge *br = netdev_priv(dev);

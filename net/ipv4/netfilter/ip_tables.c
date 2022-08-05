@@ -239,6 +239,7 @@ ipt_do_table(void *priv,
 	const struct xt_table_info *private;
 	struct xt_action_param acpar;
 	unsigned int addend;
+	//printk("Here\n");
 
 	/* Initialization */
 	stackidx = 0;
