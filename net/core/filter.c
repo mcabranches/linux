@@ -63,6 +63,8 @@
 #include <net/inet_hashtables.h>
 #include <net/inet6_hashtables.h>
 #include <net/ip_fib.h>
+#include <linux/netfilter_ipv4/ip_tables.h> //m-> bpf_ipt_helper
+#include <linux/netfilter.h> //m-> bpf_ipt_helper
 #include <net/nexthop.h>
 #include <net/flow.h>
 #include <net/arp.h>
@@ -5828,7 +5830,7 @@ BPF_CALL_5(bpf_fdb_lookup, struct xdp_buff *, ctx,
 
 static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 	.func =  bpf_fdb_lookup,
-	.gpl_only = false, 
+	.gpl_only = true, 
 	.ret_type = RET_INTEGER,
 	.arg1_type      = ARG_PTR_TO_CTX,
 	.arg2_type      = ARG_PTR_TO_MEM,
@@ -5836,6 +5838,64 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 	.arg4_type		= ARG_ANYTHING,
 	.arg5_type		= ARG_ANYTHING,
 };
+
+static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
+{
+	struct nf_hook_entries *e = NULL;
+	struct net_device *dev;
+	const char *indev;
+	const char *outdev;
+
+	dev = dev_get_by_index_rcu(net, params->ifindex);
+	//rcu_read_lock();
+	if (unlikely(!dev))
+		return -ENODEV;
+	indev = dev->name;
+
+	dev = dev_get_by_index_rcu(net, params->egress_ifindex);
+	if (unlikely(!dev))
+		return -ENODEV;
+	outdev = dev->name;
+	
+	e = rcu_dereference(net->nf.hooks_ipv4[2]); //NF_INET_FORWARD
+	//there will be more than one entry on the forward chain if we add rules to more than one table
+	//e.g., filter and mangle - Initially we will only be interested in filter rules
+	//we can for example return an invalid code if there are more than one entry
+	//Is there a way to ensure that the entry is on the filter table?
+	if (!e)
+		return -1;
+
+	if (e->num_hook_entries > 1)
+		return -2;
+	
+	
+	params->verdict = ipt_lookup(e->hooks[0].priv, iph, indev, outdev);
+	//rcu_read_unlock();
+
+	
+	return 0;
+}
+
+BPF_CALL_4(bpf_ipt_lookup, struct xdp_buff *, ctx,
+		struct bpf_ipt_lookup *, params, int, plen, struct iphdr *, iph)
+{
+		if (plen < sizeof(*params) || !(iph))
+			return -EINVAL;
+			
+		return bpf_xdp_ipt_lookup(dev_net(ctx->rxq->dev), params, iph);
+}
+
+static const struct bpf_func_proto bpf_ipt_lookup_proto = {
+	.func =  bpf_ipt_lookup,
+	.gpl_only = true, 
+	.ret_type = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM,
+	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type		= ARG_ANYTHING,
+};
+
+
 
 static struct net_device *__dev_via_ifindex(struct net_device *dev_curr,
 					    u32 ifindex)
@@ -7617,6 +7677,8 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_xdp_check_mtu_proto;
 	case BPF_FUNC_fdb_lookup:
 		return &bpf_fdb_lookup_proto;
+	case BPF_FUNC_ipt_lookup:
+		return &bpf_ipt_lookup_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_sk_lookup_udp:
 		return &bpf_xdp_sk_lookup_udp_proto;

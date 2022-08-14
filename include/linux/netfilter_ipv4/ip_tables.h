@@ -29,6 +29,9 @@ int ipt_register_table(struct net *net, const struct xt_table *table,
 void ipt_unregister_table_pre_exit(struct net *net, const char *name);
 void ipt_unregister_table_exit(struct net *net, const char *name);
 
+/* m-> bpf_ipt_lookup helper */
+extern unsigned int ipt_lookup(void *priv,  struct iphdr *iph, const char *indev, const char *outdev);
+
 /* Standard entry. */
 struct ipt_standard {
 	struct ipt_entry entry;

@@ -5018,6 +5018,18 @@ union bpf_attr {
  *
  *	Return
  *		The number of arguments of the traced function.
+ *
+ * long bpf_fdb_lookup(void *ctx, struct bpf_fdb_lookup *params, int plen, u32 flags, void *src_mac, void *dst_mac)
+ * 	Description
+ * 		fdb_lookup helper
+ * 	Return
+ * 		Code to control L2 forwarding
+ * 
+ * long bpf_ipt_lookup(void *ctx, struct bpf_ipt_lookup *params, int plen, void *iph)
+ * 	Description
+ * 		ipt_lookup helper
+ *	Return
+ * 		Code to control forwarding based on IPtable filters
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5207,6 +5219,7 @@ union bpf_attr {
 	FN(get_func_ret),		\
 	FN(get_func_arg_cnt),		\
 	FN(fdb_lookup),		\
+	FN(ipt_lookup),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -6498,6 +6511,14 @@ struct bpf_fdb_lookup {
 	__u32 egress_ifindex;
 	__u16 vid;
 	__u16 flags;
+};
+
+/* m-> ipt_lookup */
+struct bpf_ipt_lookup {
+	__u32 ifindex;
+	__u32 egress_ifindex;
+	__u16 flags;
+	__u8 verdict;
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
