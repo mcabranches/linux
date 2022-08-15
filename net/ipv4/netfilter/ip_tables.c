@@ -1948,21 +1948,26 @@ static void __exit ip_tables_fini(void)
 }
 
 /* m-> bpf_ipt_lookup helper */
-unsigned int ipt_lookup(void *priv,  struct iphdr *iph, const char *indev, const char *outdev)
+unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev)
 {
 	const struct xt_table *table = priv;
 	unsigned int hook = 2;
 	unsigned int verdict = NF_ACCEPT;
 	const void *table_base;
-	struct ipt_entry *e; //DO we need to support "jumpstack"?
+	struct ipt_entry *e; //Do we need to support "jumpstack"?
 	const struct xt_table_info *private;
 	struct xt_action_param acpar;
 	const struct xt_entry_target *t = NULL;
+	struct nf_hook_state state;
+	state.net = net;
+	state.hook = hook;
+	state.pf = 2; //where should we get this?
 
 	/* Initialization */
+	acpar.state = &state;
 	acpar.fragoff = ntohs(iph->frag_off) & IP_OFFSET;
 	acpar.thoff = iph->ihl;
-	acpar.hotdrop = false;
+	acpar.hotdrop = false; 
 
 	private = READ_ONCE(table->private); //needs READ_ONCE?
 	table_base = private->entries;
@@ -1971,6 +1976,18 @@ unsigned int ipt_lookup(void *priv,  struct iphdr *iph, const char *indev, const
 	while(e) {
 		if (ip_packet_match(iph, indev, outdev,
 		    &e->ip, acpar.fragoff)) {
+			struct sk_buff skb;
+			const struct xt_entry_match *ematch;
+			skb.head = skb.data = (unsigned char *)iph;
+			skb.network_header = 0;
+
+			xt_ematch_foreach(ematch, e) {
+				acpar.match     = ematch->u.kernel.match;
+				acpar.matchinfo = ematch->data;
+				if (!acpar.match->match(&skb, &acpar))
+					goto no_match;
+			}
+			//...
 			t = ipt_get_target(e);
 			if (!t->u.kernel.target->target) {
 				int v;
@@ -1980,6 +1997,8 @@ unsigned int ipt_lookup(void *priv,  struct iphdr *iph, const char *indev, const
 			}
 			break;
 		}
+
+no_match:
 		e = ipt_next_entry(e);
 	} 
 

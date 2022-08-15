@@ -5841,13 +5841,13 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 
 static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
 {
+	//TO-DO: rework ipt_lookup so that iptables can be compiled as a module (see my journal 08/10/2022)
 	struct nf_hook_entries *e = NULL;
 	struct net_device *dev;
 	const char *indev;
 	const char *outdev;
 
 	dev = dev_get_by_index_rcu(net, params->ifindex);
-	//rcu_read_lock();
 	if (unlikely(!dev))
 		return -ENODEV;
 	indev = dev->name;
@@ -5868,11 +5868,8 @@ static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, st
 	if (e->num_hook_entries > 1)
 		return -2;
 	
-	
-	params->verdict = ipt_lookup(e->hooks[0].priv, iph, indev, outdev);
-	//rcu_read_unlock();
+	params->verdict = ipt_lookup(net, e->hooks[0].priv, iph, indev, outdev);
 
-	
 	return 0;
 }
 
