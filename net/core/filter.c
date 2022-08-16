@@ -5839,7 +5839,7 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 	.arg5_type		= ARG_ANYTHING,
 };
 
-static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
+static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph, struct sk_buff *skb)
 {
 	//TO-DO: rework ipt_lookup so that iptables can be compiled as a module (see my journal 08/10/2022)
 	struct nf_hook_entries *e = NULL;
@@ -5868,18 +5868,18 @@ static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, st
 	if (e->num_hook_entries > 1)
 		return -2;
 	
-	params->verdict = ipt_lookup(net, e->hooks[0].priv, iph, indev, outdev);
+	params->verdict = ipt_lookup(net, e->hooks[0].priv, iph, indev, outdev, skb);
 
 	return 0;
 }
 
-BPF_CALL_4(bpf_ipt_lookup, struct xdp_buff *, ctx,
-		struct bpf_ipt_lookup *, params, int, plen, struct iphdr *, iph)
+BPF_CALL_5(bpf_ipt_lookup, struct xdp_buff *, ctx,
+		struct bpf_ipt_lookup *, params, int, plen, struct iphdr *, iph, struct sk_buff *, skb)
 {
 		if (plen < sizeof(*params) || !(iph))
 			return -EINVAL;
 			
-		return bpf_xdp_ipt_lookup(dev_net(ctx->rxq->dev), params, iph);
+		return bpf_xdp_ipt_lookup(dev_net(ctx->rxq->dev), params, iph, skb);
 }
 
 static const struct bpf_func_proto bpf_ipt_lookup_proto = {
@@ -5890,6 +5890,7 @@ static const struct bpf_func_proto bpf_ipt_lookup_proto = {
 	.arg2_type      = ARG_PTR_TO_MEM,
 	.arg3_type      = ARG_CONST_SIZE,
 	.arg4_type		= ARG_ANYTHING,
+	.arg5_type		= ARG_ANYTHING,
 };
 
 

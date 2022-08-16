@@ -1948,8 +1948,9 @@ static void __exit ip_tables_fini(void)
 }
 
 /* m-> bpf_ipt_lookup helper */
-unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev)
+unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev, struct sk_buff *skb)
 {
+	//struct sk_buff skb; //const?
 	const struct xt_table *table = priv;
 	unsigned int hook = 2;
 	unsigned int verdict = NF_ACCEPT;
@@ -1959,15 +1960,18 @@ unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const c
 	struct xt_action_param acpar;
 	const struct xt_entry_target *t = NULL;
 	struct nf_hook_state state;
+	
+	/* Initialization */
 	state.net = net;
 	state.hook = hook;
 	state.pf = 2; //where should we get this?
-
-	/* Initialization */
+	skb->head = skb->data = (unsigned char *)iph;
+	skb->network_header = 0;
 	acpar.state = &state;
 	acpar.fragoff = ntohs(iph->frag_off) & IP_OFFSET;
 	acpar.thoff = iph->ihl;
-	acpar.hotdrop = false; 
+	acpar.hotdrop = false;
+	//printk("skb size: %i", sizeof(struct sk_buff));
 
 	private = READ_ONCE(table->private); //needs READ_ONCE?
 	table_base = private->entries;
@@ -1976,15 +1980,12 @@ unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const c
 	while(e) {
 		if (ip_packet_match(iph, indev, outdev,
 		    &e->ip, acpar.fragoff)) {
-			struct sk_buff skb;
 			const struct xt_entry_match *ematch;
-			skb.head = skb.data = (unsigned char *)iph;
-			skb.network_header = 0;
 
 			xt_ematch_foreach(ematch, e) {
 				acpar.match     = ematch->u.kernel.match;
 				acpar.matchinfo = ematch->data;
-				if (!acpar.match->match(&skb, &acpar))
+				if (!acpar.match->match(skb, &acpar))
 					goto no_match;
 			}
 			//...

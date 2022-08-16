@@ -30,7 +30,7 @@ void ipt_unregister_table_pre_exit(struct net *net, const char *name);
 void ipt_unregister_table_exit(struct net *net, const char *name);
 
 /* m-> bpf_ipt_lookup helper */
-extern unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev);
+extern unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev, struct sk_buff *skb);
 
 /* Standard entry. */
 struct ipt_standard {
