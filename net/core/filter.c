@@ -5841,36 +5841,37 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 
 static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
 {
-	//TO-DO: rework ipt_lookup so that iptables can be compiled as a module (see my journal 08/10/2022)
-	struct nf_hook_entries *e = NULL;
-	struct net_device *dev;
-	const char *indev;
-	const char *outdev;
+        //TO-DO: rework ipt_lookup so that iptables can be compiled as a module (see my journal 08/10/2022)
+        struct nf_hook_entries *e = NULL;
+        struct net_device *dev;
+        const char *indev;
+        const char *outdev;
+		int hook_entry = 0;
 
-	dev = dev_get_by_index_rcu(net, params->ifindex);
-	if (unlikely(!dev))
-		return -ENODEV;
-	indev = dev->name;
+        dev = dev_get_by_index_rcu(net, params->ifindex);
+        if (unlikely(!dev))
+                return -ENODEV;
+        indev = dev->name;
 
-	dev = dev_get_by_index_rcu(net, params->egress_ifindex);
-	if (unlikely(!dev))
-		return -ENODEV;
-	outdev = dev->name;
-	
-	e = rcu_dereference(net->nf.hooks_ipv4[2]); //NF_INET_FORWARD
-	//there will be more than one entry on the forward chain if we add rules to more than one table
-	//e.g., filter and mangle - Initially we will only be interested in filter rules
-	//we can for example return an invalid code if there are more than one entry
-	//Is there a way to ensure that the entry is on the filter table?
-	if (!e)
-		return -1;
+        dev = dev_get_by_index_rcu(net, params->egress_ifindex);
+        if (unlikely(!dev))
+                return -ENODEV;
+        outdev = dev->name;
 
-	if (e->num_hook_entries > 1)
-		return -2;
-	
-	params->verdict = ipt_lookup(net, e->hooks[0].priv, iph, indev, outdev);
+        e = rcu_dereference(net->nf.hooks_ipv4[2]); //NF_INET_FORWARD
+        //there will be more than one entry on the forward chain if we add rules to more than one table
+        //e.g., filter and mangle - Initially we will only be interested in filter rules
+        //we can for example return an invalid code if there are more than one entry
+        //Is there a way to ensure that the entry is on the filter table?
+        if (unlikely(!e))
+                return -1;
 
-	return 0;
+        if (e->num_hook_entries > 1)
+                hook_entry = 1;
+
+        params->verdict = ipt_lookup(net, e->hooks[hook_entry].priv, iph, indev, outdev);
+
+        return 0;
 }
 
 BPF_CALL_4(bpf_ipt_lookup, struct xdp_buff *, ctx,

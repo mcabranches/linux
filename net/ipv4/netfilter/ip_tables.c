@@ -1950,6 +1950,7 @@ static void __exit ip_tables_fini(void)
 /* m-> bpf_ipt_lookup helper */
 unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev)
 {
+	struct sk_buff skb;
 	const struct xt_table *table = priv;
 	unsigned int hook = 2;
 	unsigned int verdict = NF_ACCEPT;
@@ -1967,7 +1968,9 @@ unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const c
 	acpar.state = &state;
 	acpar.fragoff = ntohs(iph->frag_off) & IP_OFFSET;
 	acpar.thoff = iph->ihl;
-	acpar.hotdrop = false; 
+	acpar.hotdrop = false;
+	skb.head = skb.data = (unsigned char *)iph;
+	skb.network_header = 0;
 
 	private = READ_ONCE(table->private); //needs READ_ONCE?
 	table_base = private->entries;
@@ -1976,10 +1979,7 @@ unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const c
 	while(e) {
 		if (ip_packet_match(iph, indev, outdev,
 		    &e->ip, acpar.fragoff)) {
-			struct sk_buff skb;
 			const struct xt_entry_match *ematch;
-			skb.head = skb.data = (unsigned char *)iph;
-			skb.network_header = 0;
 
 			xt_ematch_foreach(ematch, e) {
 				acpar.match     = ematch->u.kernel.match;
@@ -2009,6 +2009,7 @@ no_match:
 		return verdict;
 	}
 }
+
 
 EXPORT_SYMBOL(ipt_register_table);
 EXPORT_SYMBOL(ipt_unregister_table_pre_exit);
