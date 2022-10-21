@@ -217,6 +217,7 @@ static void trace_packet(struct net *net,
 static inline
 struct ipt_entry *ipt_next_entry(const struct ipt_entry *entry)
 {
+	//printk("get next entry\n");
 	return (void *)entry + entry->next_offset;
 }
 
@@ -239,7 +240,6 @@ ipt_do_table(void *priv,
 	const struct xt_table_info *private;
 	struct xt_action_param acpar;
 	unsigned int addend;
-	//printk("Here\n");
 
 	/* Initialization */
 	stackidx = 0;
@@ -278,6 +278,7 @@ ipt_do_table(void *priv,
 	e = get_entry(table_base, private->hook_entry[hook]);
 
 	do {
+		//printk("On match loop\n");
 		const struct xt_entry_target *t;
 		const struct xt_entry_match *ematch;
 		struct xt_counters *counter;
@@ -296,6 +297,7 @@ ipt_do_table(void *priv,
 			if (!acpar.match->match(skb, &acpar))
 				goto no_match;
 		}
+		//printk("IPtables rule matched\n");
 
 		counter = xt_get_this_cpu_counter(&e->counters);
 		ADD_COUNTER(*counter, skb->len, 1);
@@ -361,7 +363,10 @@ ipt_do_table(void *priv,
 
 	if (acpar.hotdrop)
 		return NF_DROP;
-	else return verdict;
+
+	else { 
+		return verdict;
+	}
 }
 
 /* Figures out from what hook each rule can be called: returns 0 if
@@ -1941,6 +1946,70 @@ static void __exit ip_tables_fini(void)
 	xt_unregister_targets(ipt_builtin_tg, ARRAY_SIZE(ipt_builtin_tg));
 	unregister_pernet_subsys(&ip_tables_net_ops);
 }
+
+/* m-> bpf_ipt_lookup helper */
+unsigned int ipt_lookup(struct net *net, void *priv,  struct iphdr *iph, const char *indev, const char *outdev)
+{
+	struct sk_buff skb;
+	const struct xt_table *table = priv;
+	unsigned int hook = 2;
+	unsigned int verdict = NF_ACCEPT;
+	const void *table_base;
+	struct ipt_entry *e; //Do we need to support "jumpstack"?
+	const struct xt_table_info *private;
+	struct xt_action_param acpar;
+	const struct xt_entry_target *t = NULL;
+	struct nf_hook_state state;
+	state.net = net;
+	state.hook = hook;
+	state.pf = 2; //where should we get this?
+
+	/* Initialization */
+	acpar.state = &state;
+	acpar.fragoff = ntohs(iph->frag_off) & IP_OFFSET;
+	acpar.thoff = iph->ihl;
+	acpar.hotdrop = false;
+	skb.head = skb.data = (unsigned char *)iph;
+	skb.network_header = 0;
+
+	private = READ_ONCE(table->private); //needs READ_ONCE?
+	table_base = private->entries;
+	e = get_entry(table_base, private->hook_entry[hook]);
+
+	while(e) {
+		if (ip_packet_match(iph, indev, outdev,
+		    &e->ip, acpar.fragoff)) {
+			const struct xt_entry_match *ematch;
+
+			xt_ematch_foreach(ematch, e) {
+				acpar.match     = ematch->u.kernel.match;
+				acpar.matchinfo = ematch->data;
+				if (!acpar.match->match(&skb, &acpar))
+					goto no_match;
+			}
+			//...
+			t = ipt_get_target(e);
+			if (!t->u.kernel.target->target) {
+				int v;
+				v = ((struct xt_standard_target *)t)->verdict;
+				//...
+				verdict = v;
+			}
+			break;
+		}
+
+no_match:
+		e = ipt_next_entry(e);
+	} 
+
+	if (acpar.hotdrop)
+		return NF_DROP;
+
+	else { 
+		return verdict;
+	}
+}
+
 
 EXPORT_SYMBOL(ipt_register_table);
 EXPORT_SYMBOL(ipt_unregister_table_pre_exit);
