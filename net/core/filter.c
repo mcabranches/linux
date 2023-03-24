@@ -5770,7 +5770,7 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 };
 
 //m-> add simple xdp kernel helper ...
-static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
+static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
 								unsigned char *src_mac, unsigned char *dst_mac)
 {
 	struct net_device *dev;
@@ -5819,17 +5819,37 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 	return 1;
 }
 
-BPF_CALL_5(bpf_fdb_lookup, struct xdp_buff *, ctx,
+BPF_CALL_5(bpf_xdp_fdb_lookup, struct xdp_buff *, ctx,
 		struct bpf_fdb_lookup *, params, int, plen, unsigned char *, src_mac, unsigned char *, dst_mac)
 {
 		if (plen < sizeof(*params))
 			return -EINVAL;
 			
-		return bpf_xdp_fdb_lookup(dev_net(ctx->rxq->dev), params, src_mac, dst_mac);
+		return _bpf_fdb_lookup(dev_net(ctx->rxq->dev), params, src_mac, dst_mac);
 }
 
-static const struct bpf_func_proto bpf_fdb_lookup_proto = {
-	.func =  bpf_fdb_lookup,
+static const struct bpf_func_proto bpf_xdp_fdb_lookup_proto = {
+	.func =  bpf_xdp_fdb_lookup,
+	.gpl_only = true, 
+	.ret_type = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM,
+	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type		= ARG_ANYTHING,
+	.arg5_type		= ARG_ANYTHING,
+};
+
+BPF_CALL_5(bpf_skb_fdb_lookup, struct sk_buff *, skb,
+		struct bpf_fdb_lookup *, params, int, plen, unsigned char *, src_mac, unsigned char *, dst_mac)
+{
+		if (plen < sizeof(*params))
+			return -EINVAL;
+			
+		return _bpf_fdb_lookup(dev_net(skb->dev), params, src_mac, dst_mac);
+}
+
+static const struct bpf_func_proto bpf_skb_fdb_lookup_proto = {
+	.func =  bpf_skb_fdb_lookup,
 	.gpl_only = true, 
 	.ret_type = RET_INTEGER,
 	.arg1_type      = ARG_PTR_TO_CTX,
@@ -7600,6 +7620,8 @@ tc_cls_act_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_get_socket_uid_proto;
 	case BPF_FUNC_fib_lookup:
 		return &bpf_skb_fib_lookup_proto;
+	case BPF_FUNC_fdb_lookup:
+		return &bpf_skb_fdb_lookup_proto;
 	case BPF_FUNC_check_mtu:
 		return &bpf_skb_check_mtu_proto;
 	case BPF_FUNC_sk_fullsock:
@@ -7674,7 +7696,7 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	case BPF_FUNC_check_mtu:
 		return &bpf_xdp_check_mtu_proto;
 	case BPF_FUNC_fdb_lookup:
-		return &bpf_fdb_lookup_proto;
+		return &bpf_xdp_fdb_lookup_proto;
 	case BPF_FUNC_ipt_lookup:
 		return &bpf_ipt_lookup_proto;
 #ifdef CONFIG_INET

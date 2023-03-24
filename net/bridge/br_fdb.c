@@ -1328,20 +1328,20 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 {
 	struct net_bridge *br = netdev_priv(dev);
 	struct net_bridge_fdb_entry *fdb;
-	struct net_bridge_fdb_key key;
+	//struct net_bridge_fdb_key key;
 	struct net_bridge_port *port;
 	int port_state;
 
 	//ASSERT_RTNL();
-	key.vlan_id = vid;
-	memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
+	//key.vlan_id = vid;
+	//memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
 
-	fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);
-	//rcu_read_lock();
-	//fdb = br_fdb_find_rcu(br, addr, vid);
+	//fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);
+	rcu_read_lock();
+	fdb = br_fdb_find_rcu(br, addr, vid);
 
 	if (!fdb) {
-		//rcu_read_unlock();
+		rcu_read_unlock();
 		return 0;
 	
 	}
@@ -1355,7 +1355,7 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 
 		port_state = port->state;
 
-		//rcu_read_unlock();
+		rcu_read_unlock();
 
 		if (port->state == BR_STATE_BLOCKING) {
 			return 0; //pass but do not forward
@@ -1383,9 +1383,11 @@ struct net_device *_br_fdb_find_port(const struct net_device *br_dev,
 
 	br = netdev_priv(br_dev);
 
+	rcu_read_lock();
 	f = br_fdb_find_rcu(br, addr, vid);
 	if (f && f->dst)
 		dev = f->dst->dev;
+	rcu_read_unlock();
 
 	return dev;
 }
