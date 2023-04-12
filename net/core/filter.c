@@ -5770,7 +5770,7 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 };
 
 //m-> add simple xdp kernel helper ...
-static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
+static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
 								unsigned char *src_mac, unsigned char *dst_mac)
 {
 	struct net_device *dev;
@@ -5799,7 +5799,7 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		}
 		
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
-			if (params->flags != 3) //learning already happened
+			if (params->flags != 3)  //learning already happened
 				params->flags = ops->ndo_fdb_lookup(br_dev, src_mac, params->vid);
 			egress_dev = ops->ndo_fdb_find_port(br_dev, dst_mac, params->vid);
 		}
@@ -5819,17 +5819,17 @@ static int bpf_xdp_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 	return 1;
 }
 
-BPF_CALL_5(bpf_fdb_lookup, struct xdp_buff *, ctx,
+BPF_CALL_5(bpf_xdp_fdb_lookup, struct xdp_buff *, ctx,
 		struct bpf_fdb_lookup *, params, int, plen, unsigned char *, src_mac, unsigned char *, dst_mac)
 {
 		if (plen < sizeof(*params))
 			return -EINVAL;
 			
-		return bpf_xdp_fdb_lookup(dev_net(ctx->rxq->dev), params, src_mac, dst_mac);
+		return _bpf_fdb_lookup(dev_net(ctx->rxq->dev), params, src_mac, dst_mac);
 }
 
-static const struct bpf_func_proto bpf_fdb_lookup_proto = {
-	.func =  bpf_fdb_lookup,
+static const struct bpf_func_proto bpf_xdp_fdb_lookup_proto = {
+	.func =  bpf_xdp_fdb_lookup,
 	.gpl_only = true, 
 	.ret_type = RET_INTEGER,
 	.arg1_type      = ARG_PTR_TO_CTX,
@@ -5839,7 +5839,27 @@ static const struct bpf_func_proto bpf_fdb_lookup_proto = {
 	.arg5_type		= ARG_ANYTHING,
 };
 
-static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
+BPF_CALL_5(bpf_skb_fdb_lookup, struct sk_buff *, skb,
+		struct bpf_fdb_lookup *, params, int, plen, unsigned char *, src_mac, unsigned char *, dst_mac)
+{
+		if (plen < sizeof(*params))
+			return -EINVAL;
+			
+		return _bpf_fdb_lookup(dev_net(skb->dev), params, src_mac, dst_mac);
+}
+
+static const struct bpf_func_proto bpf_skb_fdb_lookup_proto = {
+	.func =  bpf_skb_fdb_lookup,
+	.gpl_only = true, 
+	.ret_type = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM,
+	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type		= ARG_ANYTHING,
+	.arg5_type		= ARG_ANYTHING,
+};
+
+static int _bpf_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, struct iphdr *iph)
 {
         //TO-DO: rework ipt_lookup so that iptables can be compiled as a module (see my journal 08/10/2022)
         struct nf_hook_entries *e = NULL;
@@ -5874,17 +5894,17 @@ static int bpf_xdp_ipt_lookup(struct net *net, struct bpf_ipt_lookup *params, st
         return 0;
 }
 
-BPF_CALL_4(bpf_ipt_lookup, struct xdp_buff *, ctx,
+BPF_CALL_4(bpf_xdp_ipt_lookup, struct xdp_buff *, ctx,
 		struct bpf_ipt_lookup *, params, int, plen, struct iphdr *, iph)
 {
 		if (plen < sizeof(*params) || !(iph))
 			return -EINVAL;
 			
-		return bpf_xdp_ipt_lookup(dev_net(ctx->rxq->dev), params, iph);
+		return _bpf_ipt_lookup(dev_net(ctx->rxq->dev), params, iph);
 }
 
-static const struct bpf_func_proto bpf_ipt_lookup_proto = {
-	.func =  bpf_ipt_lookup,
+static const struct bpf_func_proto bpf_xdp_ipt_lookup_proto = {
+	.func =  bpf_xdp_ipt_lookup,
 	.gpl_only = true, 
 	.ret_type = RET_INTEGER,
 	.arg1_type      = ARG_PTR_TO_CTX,
@@ -5893,7 +5913,24 @@ static const struct bpf_func_proto bpf_ipt_lookup_proto = {
 	.arg4_type		= ARG_ANYTHING,
 };
 
+BPF_CALL_4(bpf_skb_ipt_lookup, struct sk_buff *, skb,
+		struct bpf_ipt_lookup *, params, int, plen, struct iphdr *, iph)
+{
+		if (plen < sizeof(*params) || !(iph))
+			return -EINVAL;
+			
+		return _bpf_ipt_lookup(dev_net(skb->dev), params, iph);
+}
 
+static const struct bpf_func_proto bpf_skb_ipt_lookup_proto = {
+	.func =  bpf_skb_ipt_lookup,
+	.gpl_only = true, 
+	.ret_type = RET_INTEGER,
+	.arg1_type      = ARG_PTR_TO_CTX,
+	.arg2_type      = ARG_PTR_TO_MEM,
+	.arg3_type      = ARG_CONST_SIZE,
+	.arg4_type		= ARG_ANYTHING,
+};
 
 static struct net_device *__dev_via_ifindex(struct net_device *dev_curr,
 					    u32 ifindex)
@@ -7600,6 +7637,10 @@ tc_cls_act_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_get_socket_uid_proto;
 	case BPF_FUNC_fib_lookup:
 		return &bpf_skb_fib_lookup_proto;
+	case BPF_FUNC_fdb_lookup:
+		return &bpf_skb_fdb_lookup_proto;
+	case BPF_FUNC_ipt_lookup:
+		return &bpf_skb_ipt_lookup_proto;
 	case BPF_FUNC_check_mtu:
 		return &bpf_skb_check_mtu_proto;
 	case BPF_FUNC_sk_fullsock:
@@ -7674,9 +7715,9 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	case BPF_FUNC_check_mtu:
 		return &bpf_xdp_check_mtu_proto;
 	case BPF_FUNC_fdb_lookup:
-		return &bpf_fdb_lookup_proto;
+		return &bpf_xdp_fdb_lookup_proto;
 	case BPF_FUNC_ipt_lookup:
-		return &bpf_ipt_lookup_proto;
+		return &bpf_xdp_ipt_lookup_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_sk_lookup_udp:
 		return &bpf_xdp_sk_lookup_udp_proto;

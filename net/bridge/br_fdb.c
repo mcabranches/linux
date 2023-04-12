@@ -1330,17 +1330,21 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 	struct net_bridge_fdb_entry *fdb;
 	//struct net_bridge_fdb_key key;
 	struct net_bridge_port *port;
+	int port_state;
 
-	ASSERT_RTNL();
+	//ASSERT_RTNL();
 	//key.vlan_id = vid;
 	//memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
 
 	//fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);
+	rcu_read_lock();
+	fdb = br_fdb_find_rcu(br, addr, vid);
 
-	fdb = br_fdb_find(br, addr, vid);
-
-	if (!fdb)
+	if (!fdb) {
+		rcu_read_unlock();
 		return 0;
+	
+	}
 	else {
 		unsigned long now = jiffies;
 
@@ -1348,6 +1352,10 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 			fdb->used = fdb->updated = now; //Linux resets both as observed with "bridge -s"
 
 		port = fdb->dst;
+
+		port_state = port->state;
+
+		rcu_read_unlock();
 
 		if (port->state == BR_STATE_BLOCKING) {
 			return 0; //pass but do not forward
@@ -1360,3 +1368,27 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 		return 1;
 	}
 }
+EXPORT_SYMBOL_GPL(br_fdb_lookup);
+
+struct net_device *_br_fdb_find_port(const struct net_device *br_dev,
+				    const unsigned char *addr,
+				    __u16 vid)
+{
+	struct net_bridge_fdb_entry *f;
+	struct net_device *dev = NULL;
+	struct net_bridge *br;
+
+	if (!netif_is_bridge_master(br_dev))
+		return NULL;
+
+	br = netdev_priv(br_dev);
+
+	rcu_read_lock();
+	f = br_fdb_find_rcu(br, addr, vid);
+	if (f && f->dst)
+		dev = f->dst->dev;
+	rcu_read_unlock();
+
+	return dev;
+}
+EXPORT_SYMBOL_GPL(_br_fdb_find_port);

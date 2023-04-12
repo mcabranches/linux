@@ -799,6 +799,9 @@ void br_fdb_offloaded_set(struct net_bridge *br, struct net_bridge_port *p,
 int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, 
 				u16 vid);
 
+struct net_device* _br_fdb_find_port(const struct net_device *br_dev, const unsigned char *addr,
+				    u16 vid);
+
 /* br_forward.c */
 enum br_pkt_type {
 	BR_PKT_UNICAST,
