@@ -5808,13 +5808,23 @@ static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 
 		if(egress_dev) {
 			params->egress_ifindex = egress_dev->ifindex;
-		//	printk(KERN_INFO "Entry found on fdb: index = %i", params->egress_ifindex);
 			/* avoid sending packets on the interface it was received */
 			if (params->egress_ifindex == params->ifindex)
 				params->flags = 0; //change this to 2 (drop) t see what happens
 		}
+		
 		else
 			return -ENODEV;
+	}
+	else if(netif_is_bridge_master(dev)) {
+			ops = dev->netdev_ops;
+			egress_dev = ops->ndo_fdb_find_port(dev, dst_mac, params->vid);
+			if(egress_dev) {
+				params->egress_ifindex = egress_dev->ifindex;
+				params->flags = 1;
+			}
+			else
+				return -ENODEV;
 	}
 	return 1;
 }
