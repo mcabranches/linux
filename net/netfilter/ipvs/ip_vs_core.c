@@ -2451,6 +2451,91 @@ static void __exit ip_vs_cleanup(void)
 	pr_info("ipvs unloaded.\n");
 }
 
+// c-> bpf_ip_vs_conn_fill_param_proto
+static int
+bpf_ip_vs_conn_fill_param_proto(struct netns_ipvs *ipvs,
+			    int af, __be16 source_port, __be16 dest_port,
+			    const struct ip_vs_iphdr *iph,
+			    struct ip_vs_conn_param *p)
+{
+	if(source_port <= 0 || dest_port <= 0)
+		return 1;
+
+	if (likely(!ip_vs_iph_inverse(iph)))
+		ip_vs_conn_fill_param(ipvs, af, iph->protocol, &iph->saddr,
+				      source_port, &iph->daddr, dest_port, p);
+	else
+		ip_vs_conn_fill_param(ipvs, af, iph->protocol, &iph->daddr,
+				      dest_port, &iph->saddr, source_port, p);
+	return 0;
+}
+
+// c-> bpf_ip_vs_conn_in_get_proto
+static struct ip_vs_conn *
+bpf_ip_vs_conn_in_get_proto(struct netns_ipvs *ipvs, int af,
+			__be16 source_port, __be16 dest_port,
+			const struct ip_vs_iphdr *iph)
+{
+	struct ip_vs_conn_param p;
+
+	if (bpf_ip_vs_conn_fill_param_proto(ipvs, af, source_port, dest_port, iph, &p))
+		return NULL;
+
+	return ip_vs_conn_in_get(&p);
+}
+
+
+// c->bpf_ip_vs_fill_iph helper
+static inline int
+bpf_ip_vs_fill_iph(int af, struct iphdr *iph, bool inverse,
+		   struct ip_vs_iphdr *iphdr)
+{
+	int hdr_flags = 0;
+
+	if (inverse)
+		hdr_flags |= IP_VS_HDR_INVERSE;
+
+	iphdr->hdr_flags = hdr_flags;
+	iphdr->off = 0; // skb_network_offset(skb) c-> Looks like this is not used anywhere. Verify
+
+	{
+		if (!iph)
+			return 0;
+
+		iphdr->len	= iph->ihl * 4;
+		iphdr->fragoffs	= 0;
+		iphdr->protocol	= iph->protocol;
+		iphdr->saddr.ip	= iph->saddr;
+		iphdr->daddr.ip	= iph->daddr;
+	}
+
+	return 1;
+}
+
+// c->bpf_ip_vs_lookup helper
+/*
+ *	Check if it's for virtual services, return
+ *	connection pointer if present
+ */
+struct ip_vs_conn *ip_vs_lookup(struct net* net, struct iphdr *_iph, __be16 source_port, __be16 dest_port)
+{
+	struct netns_ipvs *ipvs = net_ipvs(net);
+	struct ip_vs_iphdr iph;
+	struct ip_vs_proto_data *pd;
+	int af = NFPROTO_IPV4;
+
+	// c-> _iph passed from XDP prog
+	bpf_ip_vs_fill_iph(af, _iph, false, &iph);
+
+	/* Protocol supported? */
+	pd = ip_vs_proto_data_get(ipvs, iph.protocol);
+	if (unlikely(!pd)) {
+		return NULL; // c-> NF_ACCEPT;
+	}
+
+	return bpf_ip_vs_conn_in_get_proto(ipvs, af, source_port, dest_port, &iph);
+}
+
 module_init(ip_vs_init);
 module_exit(ip_vs_cleanup);
 MODULE_LICENSE("GPL");

@@ -63,6 +63,7 @@
 #include <net/inet_hashtables.h>
 #include <net/inet6_hashtables.h>
 #include <net/ip_fib.h>
+#include <net/ip_vs.h>
 #include <linux/netfilter_ipv4/ip_tables.h> //m-> bpf_ipt_helper
 #include <linux/netfilter.h> //m-> bpf_ipt_helper
 #include <net/nexthop.h>
@@ -5769,6 +5770,36 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 	.arg4_type	= ARG_ANYTHING,
 };
 
+BPF_CALL_4(bpf_ip_vs_lookup, struct xdp_buff *, ctx,
+	struct bpf_ip_vs_lookup *, params, int, plen, struct iphdr *, iph)
+{
+	struct ip_vs_conn *cp = NULL;
+	int i = 0;
+	if (plen < sizeof(*params) || !(iph))
+		return -EINVAL;
+
+	cp = ip_vs_lookup(dev_net(ctx->rxq->dev), iph, params->source_port, params->dest_port);
+
+	if(unlikely(!cp))
+		return 1;
+
+	params->in = cp->dest->addr.ip;
+	for(i = 0; i < 4; i++)
+		params->in6[i] = cp->dest->addr.ip6[i];
+
+	return 0;
+}
+
+static const struct bpf_func_proto bpf_ip_vs_lookup_proto = {
+        .func =  bpf_ip_vs_lookup,
+        .gpl_only = true,
+        .ret_type = RET_INTEGER,
+        .arg1_type      = ARG_PTR_TO_CTX,
+        .arg2_type      = ARG_PTR_TO_MEM,
+        .arg3_type      = ARG_CONST_SIZE,
+        .arg4_type     	= ARG_ANYTHING,
+};
+
 //m-> add simple xdp kernel helper ...
 static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params, 
 								unsigned char *src_mac, unsigned char *dst_mac)
@@ -7718,6 +7749,8 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_xdp_fdb_lookup_proto;
 	case BPF_FUNC_ipt_lookup:
 		return &bpf_xdp_ipt_lookup_proto;
+	case BPF_FUNC_ip_vs_lookup:
+		return &bpf_ip_vs_lookup_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_sk_lookup_udp:
 		return &bpf_xdp_sk_lookup_udp_proto;
