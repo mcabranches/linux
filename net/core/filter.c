@@ -5784,8 +5784,6 @@ BPF_CALL_4(bpf_ip_vs_lookup, struct xdp_buff *, ctx,
 		return 1;
 
 	params->in = cp->dest->addr.ip;
-	for(i = 0; i < 4; i++)
-		params->in6[i] = cp->dest->addr.ip6[i];
 
 	return 0;
 }

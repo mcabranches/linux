@@ -534,6 +534,7 @@ class PrinterHelpers(Printer):
             'struct sk_reuseport_md',
             'struct sockaddr',
             'struct tcphdr',
+            'struct iphdr',
             'struct seq_file',
             'struct tcp6_sock',
             'struct tcp_sock',

@@ -2452,7 +2452,7 @@ static void __exit ip_vs_cleanup(void)
 }
 
 // c-> bpf_ip_vs_conn_fill_param_proto
-static int
+static inline int
 bpf_ip_vs_conn_fill_param_proto(struct netns_ipvs *ipvs,
 			    int af, __be16 source_port, __be16 dest_port,
 			    const struct ip_vs_iphdr *iph,
@@ -2471,17 +2471,24 @@ bpf_ip_vs_conn_fill_param_proto(struct netns_ipvs *ipvs,
 }
 
 // c-> bpf_ip_vs_conn_in_get_proto
-static struct ip_vs_conn *
+static inline struct ip_vs_conn *
 bpf_ip_vs_conn_in_get_proto(struct netns_ipvs *ipvs, int af,
 			__be16 source_port, __be16 dest_port,
 			const struct ip_vs_iphdr *iph)
 {
 	struct ip_vs_conn_param p;
+	struct ip_vs_conn *cp;
 
 	if (bpf_ip_vs_conn_fill_param_proto(ipvs, af, source_port, dest_port, iph, &p))
 		return NULL;
 
-	return ip_vs_conn_in_get(&p);
+	cp = ip_vs_conn_in_get(&p);
+	if(cp != NULL)
+		return cp;
+
+	cp = ip_vs_conn_out_get(&p);
+
+	return cp;
 }
 
 

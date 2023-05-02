@@ -5018,13 +5018,13 @@ union bpf_attr {
  *
  *	Return
  *		The number of arguments of the traced function.
- * 
+ *
  * long bpf_fdb_lookup(void *ctx, struct bpf_fdb_lookup *params, int plen, u32 flags, void *src_mac, void *dst_mac)
  * 	Description
  * 		fdb_lookup helper
  * 	Return
  * 		Code to control L2 forwarding
- * 
+ *
  * long bpf_ipt_lookup(void *ctx, struct bpf_ipt_lookup *params, int plen, void *iph)
  * 	Description
  * 		ipt_lookup helper
