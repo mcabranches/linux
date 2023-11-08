@@ -512,6 +512,9 @@ class PrinterHelpers(Printer):
 
     type_fwds = [
             'struct bpf_fib_lookup',
+            'struct bpf_fdb_lookup',
+            'struct bpf_ipt_lookup',
+            'struct bpf_ip_vs_lookup',
             'struct bpf_sk_lookup',
             'struct bpf_perf_event_data',
             'struct bpf_perf_event_value',
@@ -531,6 +534,7 @@ class PrinterHelpers(Printer):
             'struct sk_reuseport_md',
             'struct sockaddr',
             'struct tcphdr',
+            'struct iphdr',
             'struct seq_file',
             'struct tcp6_sock',
             'struct tcp_sock',
@@ -565,6 +569,9 @@ class PrinterHelpers(Printer):
             '__wsum',
 
             'struct bpf_fib_lookup',
+            'struct bpf_fdb_lookup',
+            'struct bpf_ipt_lookup',
+            'struct bpf_ip_vs_lookup',
             'struct bpf_perf_event_data',
             'struct bpf_perf_event_value',
             'struct bpf_pidns_info',
@@ -584,6 +591,7 @@ class PrinterHelpers(Printer):
             'struct sk_reuseport_md',
             'struct sockaddr',
             'struct tcphdr',
+            'struct iphdr',
             'struct seq_file',
             'struct tcp6_sock',
             'struct tcp_sock',

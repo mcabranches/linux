@@ -1574,6 +1574,8 @@ static inline char ip_vs_fwd_tag(struct ip_vs_conn *cp)
 void ip_vs_nat_icmp(struct sk_buff *skb, struct ip_vs_protocol *pp,
 		    struct ip_vs_conn *cp, int dir);
 
+struct ip_vs_conn *ip_vs_lookup(struct net* net, struct iphdr *_iph, __be16 source_port, __be16 dest_port);
+
 #ifdef CONFIG_IP_VS_IPV6
 void ip_vs_nat_icmp_v6(struct sk_buff *skb, struct ip_vs_protocol *pp,
 		       struct ip_vs_conn *cp, int dir);
