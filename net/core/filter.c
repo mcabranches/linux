@@ -5849,7 +5849,6 @@ static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		ops = dev->netdev_ops;
 
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
-			params->flags = ops->ndo_fdb_lookup(dev, src_mac, params->vid);
 			egress_dev = ops->ndo_fdb_find_port(dev, dst_mac, params->vid);
 		}
 		else 
