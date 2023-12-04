@@ -242,16 +242,22 @@ struct net_device *br_fdb_find_port(const struct net_device *br_dev,
 	struct net_device *dev = NULL;
 	struct net_bridge *br;
 
+	printk("Here1");
+
 	ASSERT_RTNL();
 
 	if (!netif_is_bridge_master(br_dev))
 		return NULL;
+	printk("Here2");
 
 	br = netdev_priv(br_dev);
+	printk("Here3");
 	rcu_read_lock();
 	f = br_fdb_find_rcu(br, addr, vid);
+	printk("Here4");
 	if (f && f->dst)
 		dev = f->dst->dev;
+	printk("Here5");
 	rcu_read_unlock();
 
 	return dev;

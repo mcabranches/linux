@@ -5845,9 +5845,8 @@ static int _bpf_fdb_lookup(struct net *net, struct bpf_fdb_lookup *params,
 		else
 			return -ENODEV;
 	}
-	else if(!strcmp(dev->rtnl_link_ops->kind, "bridge")) {
+	else if((dev->rtnl_link_ops) && (!strcmp(dev->rtnl_link_ops->kind, "bridge"))) {
 		ops = dev->netdev_ops;
-
 		if(ops->ndo_fdb_lookup && ops->ndo_fdb_find_port) {
 			egress_dev = ops->ndo_fdb_find_port(dev, dst_mac, params->vid);
 		}
