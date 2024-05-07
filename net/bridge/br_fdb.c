@@ -161,7 +161,11 @@ static int fdb_fill_info(struct sk_buff *skb, const struct net_bridge *br,
 	return 0;
 
 nla_put_failure:
-	nlmsg_cancel(skb, nlh);
+	nlmsg_cancel(skb, nlh);	//ASSERT_RTNL();
+	//key.vlan_id = vid;
+	//memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
+
+	//fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);
 	return -EMSGSIZE;
 }
 
@@ -1333,11 +1337,6 @@ int br_fdb_lookup(const struct net_device *dev, const unsigned char *addr, u16 v
 	struct net_bridge_port *port;
 	int port_state;
 
-	//ASSERT_RTNL();
-	//key.vlan_id = vid;
-	//memcpy(key.addr.addr, addr, sizeof(key.addr.addr));
-
-	//fdb = rhashtable_lookup(&br->fdb_hash_tbl, &key, br_fdb_rht_params);
 	rcu_read_lock();
 	fdb = br_fdb_find_rcu(br, addr, vid);
 
